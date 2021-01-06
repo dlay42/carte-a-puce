@@ -48,7 +48,8 @@ cv::Mat sobel_filter_x(cv::Mat original_image) {
 			}
             if (avg_I < 0)
                 avg_I *= -1;
-			avg_I /= 4;	
+            avg_I = floor(avg_I/4);
+
             result_image.at<cv::Vec3b>(y,x)[0] = avg_I; 
             result_image.at<cv::Vec3b>(y,x)[1] = avg_I; 
             result_image.at<cv::Vec3b>(y,x)[2] = avg_I; 
@@ -83,7 +84,7 @@ cv::Mat sobel_filter_y(cv::Mat original_image) {
 
             if (avg_I < 0)
                 avg_I *= -1;
-			avg_I /= 4;	
+            avg_I = floor(avg_I/4);
             result_image.at<cv::Vec3b>(y,x)[0] = avg_I; 
             result_image.at<cv::Vec3b>(y,x)[1] = avg_I; 
             result_image.at<cv::Vec3b>(y,x)[2] = avg_I; 
@@ -146,6 +147,19 @@ void draw_cross(cv::Mat image, int radius, cv::Vec2i center) {
     }
 }
 
+double get_edges_points_number(cv::Mat image) {
+    int counter = 0;
+
+    for (int y = 0; y < image.rows; y++) {
+        for (int x = 0; x < image.cols; x++) {
+            if (image.at<cv::Vec3b>(y,x)[0] > 0) {
+                counter++;
+            }
+        }
+    }
+
+    return counter;
+}
 
 int main( int argc, char** argv ) {
 
@@ -201,43 +215,131 @@ int main( int argc, char** argv ) {
         if(!image.data) {
             std::cerr <<  "Image has not been loaded properly" << std::endl ;
             return 2;
-        } else {
-            // Initilisation des autres matrices en fonction de la taille de celle d'origine
-            gradient_image = cv::Mat(cv::Size(image.cols, image.rows), 0);
-            accumulation_matrice = cv::Mat(cv::Size(image.cols, image.rows), 0);
-            detected_circles = cv::Mat(cv::Size(image.cols, image.rows), 0);
         }
 
         // 0bis- Mettre l'image en niveau de gris
         cv::Mat grayscaled_image = grayscale_image(image);
 
         // 1 - Détection de contours : filtre + gradient
-        // 1.a - Filtre
+        // 1.a - Filtre - gradient
         cv::Mat sobel_x_image = sobel_filter_x(grayscaled_image);
         cv::Mat sobel_y_image = sobel_filter_y(grayscaled_image);
 
         // 1.b - Norme
         gradient_image = compute_gradient_norm(sobel_x_image, sobel_y_image, 50);
 
-        // 2 - Matrice d'accumulation
+        // 2 - LUT
         // 2.a - Centre de gravité
         cv::Vec2i center(compute_center(gradient_image));
         draw_cross(gradient_image, 10, center);
 
-/*
+        int theta = 0;
+        int beta = 0;
+        int ellipse_lut[360];
+
+        for (int y = 0; y < gradient_image.rows; y++) {
+            for (int x = 0; x < gradient_image.cols; x++) {
+                if (gradient_image.at<cv::Vec3b>(y,x)[0] > 0) {
+                    theta = floor(atan2(sobel_y_image.at<cv::Vec3b>(y,x)[0], sobel_x_image.at<cv::Vec3b>(y,x)[0]) * (180/M_PI));
+                    beta = floor(atan2(center[1] - y, center[0] - x) * (180/M_PI));
+                    ellipse_lut[theta] = beta;
+
+                    //std::cout << x << " ; " << y <<" : " << theta << " --- " << beta << std::endl;
+                }
+            }
+        }
+
+// -------------------------------- TEST
+
+
+        image = cv::imread("samples/synthetic/azerty.png");
+        
+        if(!image.data) {
+            std::cerr <<  "Image has not been loaded properly" << std::endl ;
+            return 2;
+        }
+
+        // 0bis- Mettre l'image en niveau de gris
+        grayscaled_image = grayscale_image(image);
+
+        // 1 - Détection de contours : filtre + gradient
+        // 1.a - Filtre - gradient
+        sobel_x_image = sobel_filter_x(grayscaled_image);
+        sobel_y_image = sobel_filter_y(grayscaled_image);
+
+        // 1.b - Norme
+        gradient_image = compute_gradient_norm(sobel_x_image, sobel_y_image, 50);
+
+        // Nombre de points contours (pour normalisation)
+        double normalized_accumulator = 255 / get_edges_points_number(gradient_image);
+        double a = 0, b = 0;
+
+        accumulation_matrice = cv::Mat(cv::Size(image.cols, image.rows), CV_8UC3, cv::Scalar(0,0,0));
+        for (int y = 0; y < gradient_image.rows; y++) {
+            for (int x = 0; x < gradient_image.cols; x++) {
+                if (gradient_image.at<cv::Vec3b>(y,x)[0] > 0) {
+                    theta = floor(atan2(sobel_y_image.at<cv::Vec3b>(y,x)[0], sobel_x_image.at<cv::Vec3b>(y,x)[0]) * (180/M_PI));
+                    beta = ellipse_lut[theta];
+                    a = tan(beta * (M_PI/180));
+                    b = y - a * x;
+                    
+                    std::cout << "y = " << a << " * x + " << b << std::endl;
+
+                    /*
+                    for (int seg_y = 0; seg_y < gradient_image.rows; seg_y++) {
+                        for (int seg_x = 0; seg_x < gradient_image.cols; seg_x++) {
+                            if (y == a * x + b) {
+                                accumulation_matrice.at<cv::Vec3b>(y,x)[0] += 1;
+                                accumulation_matrice.at<cv::Vec3b>(y,x)[1] += 1;
+                                accumulation_matrice.at<cv::Vec3b>(y,x)[2] += 1;
+                            }
+                        }
+                    }
+                    */
+                }
+            }
+        }
+
+
+
+
+
+
+
+
+
+
+
+// ------------------------------------------
+
+
+
+
+
+
+
+
+        /*
+        std::cout << normalized_accumulator << std::endl;
+
+
+        cv::Mat test = cv::Mat(cv::Size(image.cols, image.rows), CV_32FC1);
+
         for (int y = 0; y < gradient_image.rows; y++) {
             for (int x = 0; x < gradient_image.cols; x++) {
                 if (gradient_image.at<cv::Vec3b>(y,x)[0] > 0) {
                     
-                    accumulation_matrice.at<cv::Vec3b>(y,x)[0] += 1;
-                    accumulation_matrice.at<cv::Vec3b>(y,x)[1] += 1;
-                    accumulation_matrice.at<cv::Vec3b>(y,x)[2] += 1;
+                    test.at<cv::Vec3f>(y,x)[0] += normalized_accumulator;
+                    test.at<cv::Vec3f>(y,x)[1] += normalized_accumulator;
+                    test.at<cv::Vec3f>(y,x)[2] += normalized_accumulator;
                     
-                   std::cout << floor(atan2(y,x) * (180/M_PI)) << std::endl;
                 }
             }
         }
-*/
+        std::cout << test << std::endl;
+        cv::namedWindow( "test", cv::WINDOW_AUTOSIZE);
+        cv::imshow( "test", test);
+        */
 
         // 3 - Détection d'ellipses (Transformée de Hough généralisée)
 
