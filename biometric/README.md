@@ -19,9 +19,9 @@ make
 make clean
 ```
 
-Sur une image (option -f ou --file) :
+Sur une image (option -f (--file) et -s (--shape)) :
 ```console
-bin/BiometricAuth -f <FILE_PATH>
+bin/BiometricAuth -f <IMAGE_FILE_PATH> -s <SHAPE_FILE_PATH>
 ```
 
 En temps réel (sans option) :
