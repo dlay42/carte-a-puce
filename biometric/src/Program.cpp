@@ -328,7 +328,7 @@ int main( int argc, char** argv ) {
         for (int y = 0; y < gradient_image.rows; y++) {
             for (int x = 0; x < gradient_image.cols; x++) {
                 if (gradient_image.at<cv::Vec3b>(y,x)[0] > 0) {
-                    
+
                     theta = floor(180 + atan2(sobel_y_image.at<float>(y,x) - 255/2, sobel_x_image.at<float>(y,x) - 255/2) * (180/M_PI));
 
                     for (std::vector<cv::Vec2i>::const_iterator it = ellipse_lut[theta].begin(); it != ellipse_lut[theta].end(); ++it) {
@@ -336,7 +336,7 @@ int main( int argc, char** argv ) {
                             accumulation_mat.at<float>(y + (*it)[1], x + (*it)[0]) += normalized_accumulator;
                         }
                     }
-                    
+
                 }
             }
         }
@@ -368,6 +368,9 @@ int main( int argc, char** argv ) {
                 if (detected_circles.at<cv::Vec3b>(y,x)[0] > 250) {
                     draw_shape(detected_circles, shape, cv::Vec2i(x,y));
                     draw_cross(detected_circles, 10, cv::Vec2i(x,y));
+            
+                    draw_shape(image, shape, cv::Vec2i(x,y));
+                    draw_cross(image, 10, cv::Vec2i(x,y));
                 }
             }
         }
@@ -399,7 +402,38 @@ int main( int argc, char** argv ) {
     } else {
     // CAS #2 : Fichier (image) non spécifiée : application des procédés des traite-
     //          -ments d'image sur le périphérique vidéo (temps réel).
-        std::cout << "EMPTY" << std::endl;
+        cv::Mat frame;
+        //--- INITIALIZE VIDEOCAPTURE
+        cv::VideoCapture cap;
+        // open the default camera using default API
+        // cap.open(0);
+        // OR advance usage: select any API backend
+        int deviceID = 0;             // 0 = open default camera
+        int apiID = cv::CAP_ANY;      // 0 = autodetect default API
+        // open selected camera using selected API
+        cap.open(deviceID, apiID);
+        // check if we succeeded
+        if (!cap.isOpened()) {
+            std::cerr << "ERROR! Unable to open camera\n";
+            return -1;
+        }
+        //--- GRAB AND WRITE LOOP
+        std::cout << "Start grabbing" << std::endl
+            << "Press any key to terminate" << std::endl;
+        for (;;)
+        {
+            // wait for a new frame from camera and store it into 'frame'
+            cap.read(frame);
+            // check if we succeeded
+            if (frame.empty()) {
+                std::cerr << "ERROR! blank frame grabbed\n";
+                break;
+            }
+            // show live and wait for a key with timeout long enough to show images
+            imshow("Live", frame);
+            if (cv::waitKey(5) >= 0)
+                break;
+        }
     }
 
     return 0;
