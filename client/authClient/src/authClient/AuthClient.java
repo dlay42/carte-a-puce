@@ -43,6 +43,7 @@ public class AuthClient extends Thread {
                     socket = new Socket(host.getHostName(), 9876);
                 	
                     //write to socket using ObjectOutputStream
+					classLogger("Send data to server : " + message);
                     oos = new ObjectOutputStream(socket.getOutputStream());
                     oos.writeObject(message);
                     

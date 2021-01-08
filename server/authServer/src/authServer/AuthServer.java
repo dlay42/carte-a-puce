@@ -47,6 +47,8 @@ public class AuthServer extends Thread {
 					rcvLastName = "",
 					rcvSalt1 = "",
 					rcvRch = "";
+			String	sessionToken = "";
+			String  userId = "";
 			while(true){
 	            //creating socket and waiting for client connection (bloquant)
 	            Socket socket = server.accept();
@@ -68,49 +70,103 @@ public class AuthServer extends Thread {
 	                parsedData = data.split(";");
 	                
 		            switch(flag) {
-	            	/***
-	            	 * Hello:
-	            	 * HEL1 + <NOM>;<PRENOM>
-	            	 * TODO: add biometric histo.
-	            	 */
-	            	case "HEL1":
-	            		rcvName = parsedData[1];
-	            		rcvLastName = parsedData[2];
-	            		break;
-	            	/***
-	            	 * Registration:
-	            	 * REG1 + <NOM>;<PRENOM>;<SALT1>
-	            	 */
-	            	case "REG1":
-	            		rcvName = parsedData[1];
-	            		rcvLastName = parsedData[2];
-	            		rcvSalt1 = parsedData[3];
-	            		
-	            		if (dbConnection.insertUserRow(rcvName, rcvLastName, rcvSalt1) == 0) {
-	            			Thread.sleep(100);
-	            			classLogger("Send response to client : REG1;OK");
-	            			oos.writeObject("REG1;OK");
-	            		} else {
-	            			Thread.sleep(100);
-	            			classLogger("Send response to client : REG1;KO");
-	            			oos.writeObject("REG1;KO");
-	            		}
-	            		break;
-	            	/***
-	            	 * Login phase #1:
-	            	 * LOG1 + <H(SALT2 + SALT1)>
-	            	 */
-	            	case "LOG1":
-	            		rcvRch = parsedData[1];
-	            		break;
-	            		
-	            	default:
-	            		//
+						/***
+						* Hello:
+						* HEL1 + <PRENOM>;<NOM>
+						* TODO: add biometric histo.
+						* -> Received `whoami` info. 
+						* -> Generate session token
+						* -> Associate `whoami`and token in DB
+						* (add database entry in `auth_session` table)	
+						*/
+						case "HEL1":
+							rcvName = parsedData[1];
+							rcvLastName = parsedData[2];
+
+							for (int i = 0; i < 1000; i++) {
+								sessionToken += generateSessionToken();
+							}
+							
+							// Get userId
+							userId = dbConnection.userExistsNameLastName(rcvName, rcvLastName);
+
+							if (!userId.isEmpty()) {
+								if (dbConnection.insertSessionRow(sessionToken, userId) == 0) {
+									Thread.sleep(100);
+									classLogger("Send response to client : HEL1;" + sessionToken);
+									oos.writeObject("HEL1;" + sessionToken);
+								} else {
+									Thread.sleep(100);
+									classLogger("Send response to client : HEL1;KO");
+									oos.writeObject("HEL1;KO");
+								}
+							}
+
+							break;
+						/***
+						* Registration:
+						* REG1 + <PRENOM>;<NOM>;<SALT1>
+						*/
+						case "REG1":
+							rcvName = parsedData[1];
+							rcvLastName = parsedData[2];
+							rcvSalt1 = parsedData[3];
+							
+							if (dbConnection.insertUserRow(rcvName, rcvLastName, rcvSalt1) == 0) {
+								Thread.sleep(100);
+								classLogger("Send response to client : REG1;OK");
+								oos.writeObject("REG1;OK");
+							} else {
+								Thread.sleep(100);
+								classLogger("Send response to client : REG1;KO");
+								oos.writeObject("REG1;KO");
+							}
+							break;
+						/***
+						* Login phase #1:
+						* LOG1 + </DBDKF2/ H(SALT2 + SALT1)><NAME(provisoire)>;<LAST_NAME(provisoire)>
+						*/
+						case "LOG1":
+							rcvRch = parsedData[1];
+							rcvName = parsedData[2];
+							rcvLastName = parsedData[3];
+							
+							// Get userId
+							userId = dbConnection.userExistsNameLastName(rcvName, rcvLastName);
+							
+							if (!userId.isEmpty()) {
+								String sessionTokenFound = dbConnection.getTokenUserId(userId);
+								String hashPassword = dbConnection.getHashPasswordUserId(userId);
+								String recomputedRch = String.valueOf(hashPassword.hashCode());
+								/***
+								 * Compute and compare with rch and grant or deny access
+								 */				
+								classLogger("Before derivation (recompute) : " + recomputedRch);
+								for (int i = 0; i < 10; i++) {
+									recomputedRch = String.valueOf((recomputedRch + sessionTokenFound).hashCode());
+								}
+								classLogger("After derivation (recompute) : " + recomputedRch);
+
+								classLogger("Compare : " + recomputedRch + " and " + rcvRch);
+								if (recomputedRch.equals(rcvRch)) {
+									Thread.sleep(100);
+									classLogger("Send response to client : LOG1;OK");
+									oos.writeObject("LOG1;OK");
+								} else {
+									Thread.sleep(100);
+									classLogger("Send response to client : LOG1;KO");
+									oos.writeObject("LOG1;KO");
+								}
+								
+							}
+							
+							break;
+							
+						default:
+							//
 		            }
 	            }
 	            
-	            
-
 	            // Cleanup
 	            ois.close();
 	            oos.close();

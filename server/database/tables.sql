@@ -2,8 +2,8 @@
 -- TODO: split sensitive data from user table to dedicated tables
 USE authdb;
 
-DROP TABLE IF EXISTS auth_user;
 DROP TABLE IF EXISTS auth_session;
+DROP TABLE IF EXISTS auth_user;
 
 CREATE TABLE auth_user (
     user_id VARCHAR(50) NOT NULL,
@@ -17,6 +17,7 @@ CREATE TABLE auth_user (
 );
 
 -- TODO: change and manage sessions programmatically
+-- storing session token in sessions
 CREATE TABLE auth_session (
     token VARCHAR(256) NOT NULL,
     user_id VARCHAR(50)  NOT NULL,
@@ -24,7 +25,7 @@ CREATE TABLE auth_session (
     FOREIGN KEY (user_id) REFERENCES auth_user(user_id)
 );
 
-INSERT INTO(
+INSERT INTO auth_user VALUES (
     "azerty",
     "toto",
     "tutu",
@@ -32,4 +33,4 @@ INSERT INTO(
     "123",
     "123",
     "123"
-) VALUES auth_user;
+);

@@ -19,8 +19,14 @@ public class WindowLogin {
 	private JTextField textFieldLogin;
 	private JPasswordField passwordField;
 
-	private AuthClient serverConnection;
+	private String userName;
+	private String userLastName;
 	
+	private String salt2;
+
+	private AuthClient serverConnection;
+	private WindowServerEventListener serverEventListener;
+
 	/**
 	 * Create the application.
 	 */
@@ -33,11 +39,75 @@ public class WindowLogin {
 				try {
 					initialize();
 					frame.setVisible(true);
+					serverEventListener = new WindowServerEventListener("WindowServerEventListener");
+					serverEventListener.start();
+					card.checkCardReader();
+					card.checkSmartcard();
+					card.connectCard();
+					String[] parsedData = card.readOnCard().split(";");
+					if (parsedData.length >= 2) {
+						userName = parsedData[0];
+						userLastName = parsedData[1];
+
+						/***
+						 * Send userName and userLastName to server
+						 */
+						serverConnection.setMessage("HEL1" + ";" + userName + ";" + userLastName);
+
+					}					
 				} catch (Exception e) {
 					e.printStackTrace();
 				}
 			}
 		});
+	}
+
+	
+	class WindowServerEventListener extends Thread { 
+
+		public WindowServerEventListener (String s) {
+				super(s);
+				this.setDaemon(true);
+			}
+			
+		public void run() { 
+			String flag = "";
+			String data = "";
+			String[] parsedData;
+			try {
+				while(true) {
+					Thread.sleep(250);
+					if (serverConnection != null && !serverConnection.getLastResponse().isEmpty()) {
+						parsedData = serverConnection.getLastResponse().split(";");
+						flag = parsedData[0];
+						data = parsedData[1];
+						switch(flag) {
+							/***
+							* HELLO : get SALT 2
+							*/
+							case "HEL1":
+								salt2 = data;
+								break;
+								/***
+								* LOG1 : Auth result
+								*/
+							case "LOG1":
+								/*
+								if (data.equals("OK")) {
+									classLogger("Access granted");
+								} else if (data.equals("KO")) {
+									classLogger("Access denied");
+								}
+								*/
+							default:
+								//
+						}
+					}
+				}
+			} catch (Exception e) {
+				e.printStackTrace();
+			}
+		} 
 	}
 
 	/**
@@ -81,11 +151,30 @@ public class WindowLogin {
 						userPassword = passwordField.getText();
 				
 				/*** TODO
-				 * Inscription à la base de données
-				 * Envoi du SALT1 = H(login+passwd)
+				 * PBDKF2
 				 */
-				String salt1 = userLogin + userPassword;
-				System.out.println(salt1.hashCode());
+				String rch = String.valueOf((userLogin + userPassword).hashCode());
+				
+				classLogger("Before derivation : " + rch);
+				for (int i = 0; i < 100; i++) {
+					rch = String.valueOf((rch + salt2).hashCode());
+				}
+				classLogger("After derivation : " + rch);
+
+				/*** /!\ CHEAT
+				 * Conceptuellement nous voulions stocker le token de session directement
+				 * la session utilisateur. Par faute de temps, nous n'avons pas pu implémenter
+				 * cette fonctionnalité. Nous avons ainsi stocké les token sur la DB (ce qu'il ne faut
+				 * pas faire) pendant ce temps.
+				 * Or, nous ne pouvons donc plus faire le lien entre le token session et l'utilisateur
+				 * (côté serveur) pour recalculer le rch. Nous trichons donc en attendant en repassant
+				 * les données "QUI JE SUIS"
+				 */
+				 /***
+				  * WHO AM I ?
+				  */
+				serverConnection.setMessage("LOG1;" + rch + ';' + userName + ';' + userLastName);
+
 			}
 		});
 		btnLogin.setBounds(154, 209, 127, 25);
