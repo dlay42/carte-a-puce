@@ -52,7 +52,7 @@ public class AuthDatabase {
 			classLogger("Adding user in DB with parameters : name=" + name + "; lastName=" + lastName + "; salt1=" + salt1 );
 			
 			PreparedStatement preparedStatement = dbConnection.prepareStatement(SQL_INSERT);
-	        preparedStatement.setString(1, String.valueOf((name+lastName+salt1).hashCode())); // To change
+	        preparedStatement.setString(1, AuthServerUtils.sha256Signature(name+lastName+salt1)); // To change
 	        preparedStatement.setString(2, name);
 	        preparedStatement.setString(3, lastName);
 	        preparedStatement.setString(4, "123"); // Not implemented

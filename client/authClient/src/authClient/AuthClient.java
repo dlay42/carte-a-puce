@@ -19,16 +19,12 @@ import java.util.Random;
  */
 public class AuthClient extends Thread {
 	
-	/***
-	 * Server infos.
-	 */
+	// Server infos.
 	private Socket clientSocket;
 	private String serverAddr;
 	private int serverPort;
 	
-	/***
-	 * Client/server communication canals
-	 */
+	// Client/server communication canals
 	BufferedReader inputStream;
 	PrintWriter outputStream;
 
@@ -36,11 +32,10 @@ public class AuthClient extends Thread {
 	private String response;
 	private String lastResponse;
 
-	/***
-	 * Session data
-	 */
+	// Session data
 	private String sessionToken;
 	
+	// GETTERS & SETTERS
 	public void setSessionToken(String token) {
 		sessionToken = token;
 	}
@@ -49,9 +44,19 @@ public class AuthClient extends Thread {
 		return sessionToken;
 	}
 	
-	/***
-	 * Constructor
-	 */
+	public void setMessage(String msg) {
+		message = msg;
+	}
+	
+	public String getLastResponse() {
+		return lastResponse;
+	}
+	
+	public void setLastResponse(String msg) {
+		lastResponse = msg;
+	}
+	
+	// CONSTRUCTOR
 	public AuthClient (String s, String argServerAddr, int argServerPort) {
 		super(s);
 		this.setDaemon(true);
@@ -71,18 +76,7 @@ public class AuthClient extends Thread {
 		}
 	}
 
-	public void setMessage(String msg) {
-		message = msg;
-	}
-	
-	public String getLastResponse() {
-		return lastResponse;
-	}
-	
-	public void setLastResponse(String msg) {
-		lastResponse = msg;
-	}
-
+	// THREAD IMPLEM.
 	public void run() { 
 		try {    
             while (true) {
@@ -113,6 +107,7 @@ public class AuthClient extends Thread {
 		}
 	}
 	
+	// UTILS
 	public void classLogger(String msg) {
 		System.out.println("[AuthClient]: " + msg);
 	}

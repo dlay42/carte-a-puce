@@ -9,31 +9,36 @@ import javax.smartcardio.CommandAPDU;
 import javax.smartcardio.ResponseAPDU;
 import javax.smartcardio.TerminalFactory;
 
+/***
+ * Smartcard.class
+ * @author dlay
+ * Class representing Smartcard with various actions including :
+ *  - reader/card check
+ *  - card connection
+ *  - auth card (PIN hardcoded (TODO))
+ *  - read card
+ *  - write card
+ */
 public class Smartcard {
 
-	/***
-	 * Demande du PIN à l'utilisateur non implémenté
-	 * pour l'instant
-	 */
+	// Card infos.
 	private byte[] csc0 = {(byte) 0xaa, (byte) 0xaa, (byte) 0xaa, (byte) 0xaa};
     private CardTerminal cardReader;
     private Card smartcard;
     private String text=new String();
     private CardChannel channel;
-    
+    private smartcardProcessStatus status = smartcardProcessStatus.INIT;
 	public enum smartcardProcessStatus {
-	    READER_MISSING, WAITING, READING
+	    INIT, READER_MISSING, WAITING, READING
 	};
 	
-    private smartcardProcessStatus status = smartcardProcessStatus.READER_MISSING;
     
-    /***
-     * Constructor
-     */
+    // CONSTRUCTOR
     public Smartcard() {
     	setStatus(smartcardProcessStatus.READER_MISSING);
     }
     
+    // GETTERS & SETTERS
     public smartcardProcessStatus getStatus() {
     	return status;
     }
@@ -45,31 +50,12 @@ public class Smartcard {
     public byte[]getCSC0() {
     	return csc0;
     }
-    
-    private void classLogger(String msg) {
-    	System.out.println("[Smartcard]: " + msg);
-    }
- 
-    
-    private void statusLogger() {
-    	switch(status) {
-    	case READER_MISSING:
-    		classLogger("Please, attach your card reader.");
-    		break;
-    	case WAITING:
-    		classLogger("Please, insert your card.");
-    		break;
-    	case READING:
-    		classLogger("Processing... We are reading your card informations.");
-    		break;
-    	default: 
-    		classLogger("Unknown status.");
-    	}
-    }
-    
+
     private void setStatus(smartcardProcessStatus newStatus) {
-    	status = newStatus;
-    	statusLogger();
+    	if (!status.equals(newStatus)) {
+        	status = newStatus;
+        	statusLogger();
+    	}
     }
     
     public List<CardTerminal> getReaders() {
@@ -80,63 +66,32 @@ public class Smartcard {
     	}
     }
     
-    /***
-     * Checking methods
-     */
-    public List<CardTerminal> checkCardReader() {
-    	
-    	List<CardTerminal> availableReaders;
-    	
-    	do {
-    		availableReaders = getReaders();
-    	} while (availableReaders == null);
-    	
-    	cardReader = availableReaders.get(0);
-    	classLogger("Card reader detected : " + cardReader.toString());
-    	setStatus(smartcardProcessStatus.WAITING);
-    	
-    	return availableReaders;
-    }
     
-    public Card checkSmartcard() {
-
+    // Checking methods
+    public void checkCard() {
+    	List<CardTerminal> availableReaders;
     	Card currentCard = null;
     	
-    	do {
-    		try {
-				currentCard = cardReader.connect("T=0");
-			} catch (CardException e) {
-				//
-			}
-    	} while (currentCard == null);
     	
-    	smartcard = currentCard;
-    	classLogger("Card detected : " + AuthClientUtils.byteArrayToString(smartcard.getATR().getBytes()));
-    	setStatus(smartcardProcessStatus.READING);
+    	availableReaders = getReaders();
     	
-    	return smartcard;
+    	if (availableReaders != null) {
+        	cardReader = availableReaders.get(0);
+        	if (currentCard == null) {
+        		try {
+    				currentCard = cardReader.connect("T=0");
+    				smartcard = currentCard;
+    				setStatus(smartcardProcessStatus.READING);
+    				channel = smartcard.getBasicChannel();
+    			} catch (CardException e) {
+    				setStatus(smartcardProcessStatus.WAITING);
+    			}
+        	}
+    	} else {
+    		setStatus(smartcardProcessStatus.READER_MISSING);
+    	}
     }
-    
-    public void connectCard() {
-    	channel = smartcard.getBasicChannel();
-    }
-    
 
-/*
-    public static void main(String[] args) {
-    	Smartcard card = new Smartcard();
-    	
-    	card.checkCardReader();
-    	card.checkSmartcard();
-
-		card.connectCard();
-
-		card.writeOnCard("az;ertyqsdfgh");
-		
-		System.out.println(card.readOnCard());
-
-    }
-*/
     /***
      * Vérifie le premier PIN (CSC0)
      * Si :
@@ -291,5 +246,28 @@ public class Smartcard {
     	
 		classLogger("USER1 has been read successfully - received : " + AuthClientUtils.hexToString(toReturn));
     	return AuthClientUtils.hexToString(toReturn);
+    }
+    
+    // UTILS
+    private void classLogger(String msg) {
+    	System.out.println("[Smartcard]: " + msg);
+    }
+    
+    private void statusLogger() {
+    	switch(status) {
+    	case READER_MISSING:
+    		classLogger("Please, attach your card reader.");
+    		break;
+    	case WAITING:
+    		classLogger("Card reader detected : " + cardReader.toString());
+    		classLogger("Please, insert your card.");
+    		break;
+    	case READING:
+        	classLogger("Card detected : " + AuthClientUtils.byteArrayToString(smartcard.getATR().getBytes()));
+    		classLogger("Processing... We are reading your card informations.");
+    		break;
+    	default: 
+    		classLogger("Unknown status.");
+    	}
     }
 }

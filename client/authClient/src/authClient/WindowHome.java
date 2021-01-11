@@ -17,13 +17,16 @@ import javax.swing.Box;
 import java.awt.event.ActionListener;
 import java.awt.event.ActionEvent;
 
+/***
+ * WindowHome.class
+ * @author dlay
+ * Homepage JFrame
+ */
 public class WindowHome {
 
 	private JFrame frame;
 
-	/**
-	 * Create the application.
-	 */
+	// CONSTRUCTOR
 	public WindowHome() {
 		
 		EventQueue.invokeLater(new Runnable() {
@@ -38,9 +41,7 @@ public class WindowHome {
 		});
 	}
 
-	/**
-	 * Initialize the contents of the frame.
-	 */
+	// INIT. FRAME
 	private void initialize() {
 		frame = new JFrame();
 		frame.setBounds(100, 100, 450, 300);

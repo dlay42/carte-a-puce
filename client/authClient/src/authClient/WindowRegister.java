@@ -12,8 +12,16 @@ import javax.swing.JPasswordField;
 import javax.swing.SwingConstants;
 import javax.swing.JButton;
 import java.awt.event.ActionListener;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.awt.event.ActionEvent;
 
+/***
+ * WindowRegister.class
+ * @author dlay
+ * JFrame implementing registration tasks
+ */
 public class WindowRegister {
 
 	private Smartcard card;
@@ -81,9 +89,7 @@ public class WindowRegister {
 		} 
 	}
 	
-	/**
-	 * Create the application.
-	 */
+	// CONSTRUCTOR
 	public WindowRegister(Smartcard readCard) {
 		card = readCard;
 		serverConnection = new AuthClient("RegisterAuthClient", "127.0.0.1", 9876);
@@ -102,9 +108,7 @@ public class WindowRegister {
 		});
 	}
 
-	/**
-	 * Initialize the contents of the frame.
-	 */
+	// INIT. FRAME
 	private void initialize() {
 		frame = new JFrame();
 		frame.setBounds(100, 100, 450, 300);
@@ -185,10 +189,12 @@ public class WindowRegister {
 							
 							/***
 							 * Inscription à la base de données
-							 * Envoi du SALT1 = H(login+passwd)
+							 * Envoi du HASH = H(SALT1+passwd)
 							 */
-							String salt1 = userLogin + userPassword;
-							serverConnection.setMessage("REG1;" + toWriteOnCard + ';' + salt1.hashCode());
+							String hashSignature = userLogin + userPassword;
+
+							// SHA-256 signature
+							serverConnection.setMessage("REG1;" + toWriteOnCard + ';' + AuthClientUtils.sha256Signature(hashSignature));
 						}
 					
 				}

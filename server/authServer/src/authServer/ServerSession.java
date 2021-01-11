@@ -138,7 +138,7 @@ class ServerSession implements Runnable {
 							 * Compute and compare with rch and grant or deny access
 							 */
 							for (int i = 0; i < 1000; i++) {
-								recomputedRch = String.valueOf((recomputedRch + sessionToken).hashCode());
+								recomputedRch = AuthServerUtils.sha256Signature(recomputedRch + sessionToken);
 							}
 							
 							classLogger("Compare : " + recomputedRch + " and " + rch);

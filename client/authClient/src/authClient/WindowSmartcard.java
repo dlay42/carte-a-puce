@@ -19,6 +19,11 @@ import javax.swing.JButton;
 import java.awt.event.ActionListener;
 import java.awt.event.ActionEvent;
 
+/***
+ * WindowSmartcard.class
+ * @author dlay
+ * JFrame implementing reading card tasks
+ */
 public class WindowSmartcard {
 
 	private Smartcard card;
@@ -27,86 +32,28 @@ public class WindowSmartcard {
 	private JButton btnRegister;
 	private JButton btnLogin;
 	
-	private SmartcardReaderListener smartcardReaderListener;
-	private SmartcardActionEvent smartcardActionEventListener;
+	private SmartcardReaderListener smartcardFrameListener;
+	private ServerEventListener smartcardEventListener;
 	
 	private AuthClient serverConnection;
-	
-	class SmartcardReaderListener extends Thread { 
 
-		public SmartcardReaderListener (String s) {
-			super(s);
-			this.setDaemon(true);
-		}
-			
-		public void run() { 
-			try {
-				while(true) {
-					if (card != null) {
-						switch(card.getStatus()) {
-							case READER_MISSING:
-								lblSmartcardReaderStatus.setText("Veuillez connecter votre lecteur de carte...");
-								break;
-							case WAITING:
-								lblSmartcardReaderStatus.setText("Veuillez insérer votre carte...");
-								break;
-							case READING:
-								lblSmartcardReaderStatus.setText("Lecture de la carte...");
-								lblSmartcardReaderStatus.setVisible(false);
-								btnRegister.setVisible(true);
-								btnLogin.setVisible(true);
-
-								break;
-							default:
-								//
-						}
-					}
-				}
-			} catch (Exception e) {
-				e.printStackTrace();
-			}
-		} 
-	}
-	
-	class SmartcardActionEvent extends Thread { 
-
-		public SmartcardActionEvent (String s) {
-			super(s);
-			this.setDaemon(true);
-		}
-			
-		public void run() { 
-			try {
-				if (card != null) {
-					card.checkCardReader();
-					card.checkSmartcard();
-					card.connectCard();
-				}
-			} catch (Exception e) {
-				e.printStackTrace();
-			}
-		} 
-	}
-	
-	/**
-	 * Create the application.
-	 */
+	// CONSTRUCTOR
 	public WindowSmartcard() {
 
 		card = new Smartcard();
-		//serverConnection = new AuthClient("SmartcardAuthClient");
-		//serverConnection.start();
+		serverConnection = new AuthClient("SmartcardAuthClient", "127.0.0.1", 9876);
+		serverConnection.start();
+		smartcardEventListener = new ServerEventListener("ServerEventListener", serverConnection, getSelf());
+		smartcardEventListener.start();
 
 		EventQueue.invokeLater(new Runnable() {
 			public void run() {
 				try {
 					initialize();
 					frame.setVisible(true);
-					
-					smartcardReaderListener = new SmartcardReaderListener("SmartcardReaderListener");
-					smartcardReaderListener.start();
-					smartcardActionEventListener = new SmartcardActionEvent("SmartcardActionEvent");
-					smartcardActionEventListener.start();
+										
+					smartcardFrameListener = new SmartcardReaderListener("SmartcardReaderListener", card, getSelf());
+					smartcardFrameListener.start();
 				} catch (Exception e) {
 					e.printStackTrace();
 				}
@@ -116,9 +63,36 @@ public class WindowSmartcard {
 		
 	}
 
-	/**
-	 * Initialize the contents of the frame.
-	 */
+	// GETTERS & SETTERS (JFrame elements)
+    public WindowSmartcard getSelf() {
+    	return this;
+    }
+	
+	// VISIBILITY
+	public void setFrameVisible(boolean visible) {
+		if (visible != frame.isVisible())
+			frame.setVisible(visible);
+	}
+    
+	public void setLblSmartcardReaderStatusVisible(boolean visible) {
+		lblSmartcardReaderStatus.setVisible(visible);
+	}
+	
+	public void setBtnRegisterVisible(boolean visible) {
+		btnRegister.setVisible(visible);
+	}
+	
+	public void setBtnLoginVisible(boolean visible) {
+		btnLogin.setVisible(visible);
+	}
+	
+	// LABEL TEXT
+	public void setLblSmartcardReaderStatusText(String text) {
+		lblSmartcardReaderStatus.setText(text);
+	}
+	
+	
+	// INIT FRAME
 	private void initialize() {
 		frame = new JFrame();
 		frame.setBounds(100, 100, 450, 300);
@@ -157,8 +131,21 @@ public class WindowSmartcard {
 		btnLogin = new JButton("Se connecter");
 		btnLogin.addActionListener(new ActionListener() {
 			public void actionPerformed(ActionEvent arg0) {
+				String[] parsedData;
+				String 	userName = "",
+						userLastName = "";
+				
+				parsedData = card.readOnCard().split(";");
+				if (parsedData.length >= 2) {
+					userName = parsedData[0];
+					userLastName = parsedData[1];
+
+					// Send userName and userLastName to server
+					serverConnection.setMessage("HEL1" + ";" + userName + ";" + userLastName);
+				}
+				
 				frame.setVisible(false);
-				WindowLogin loginWindow = new WindowLogin(card);
+				WindowLogin loginWindow = new WindowLogin(card, serverConnection);
 			}
 		});
 		springLayout.putConstraint(SpringLayout.NORTH, btnLogin, 0, SpringLayout.NORTH, btnRegister);

@@ -6,7 +6,7 @@ DROP TABLE IF EXISTS auth_session;
 DROP TABLE IF EXISTS auth_user;
 
 CREATE TABLE auth_user (
-    user_id VARCHAR(50) NOT NULL,
+    user_id VARCHAR(256) NOT NULL,
     name VARCHAR(32) NOT NULL,
     last_name VARCHAR(32) NOT NULL,
 	biometric_histo_R VARCHAR(256) NOT NULL,
@@ -20,17 +20,7 @@ CREATE TABLE auth_user (
 -- storing session token in sessions
 CREATE TABLE auth_session (
     token VARCHAR(256) NOT NULL,
-    user_id VARCHAR(50)  NOT NULL,
+    user_id VARCHAR(256)  NOT NULL,
     PRIMARY KEY(token),
     FOREIGN KEY (user_id) REFERENCES auth_user(user_id)
-);
-
-INSERT INTO auth_user VALUES (
-    "azerty",
-    "toto",
-    "tutu",
-    "123",
-    "123",
-    "123",
-    "123"
 );

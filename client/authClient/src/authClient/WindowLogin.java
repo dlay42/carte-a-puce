@@ -10,8 +10,16 @@ import javax.swing.JTextField;
 import javax.swing.JPasswordField;
 import javax.swing.JButton;
 import java.awt.event.ActionListener;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.awt.event.ActionEvent;
 
+/***
+ * WindowLogin.class
+ * @author dlay
+ * JFrame implementing login tasks
+ */
 public class WindowLogin {
 
 	private Smartcard card;
@@ -25,36 +33,24 @@ public class WindowLogin {
 	private String salt2;
 
 	private AuthClient serverConnection;
-	private WindowServerEventListener serverEventListener;
+	private ServerEventListener loginServerEventListener;
+	private SmartcardReaderListener loginSmartcardReaderListener;
 
-	/**
-	 * Create the application.
-	 */
-	public WindowLogin(Smartcard readCard) {
+	// CONSTRUCTOR
+	public WindowLogin(Smartcard readCard, AuthClient argServerConnection) {
 		card = readCard;
-		serverConnection = new AuthClient("LoginAuthClient", "127.0.0.1", 9876);
-		serverConnection.start();
+		serverConnection = argServerConnection;
+		
 		EventQueue.invokeLater(new Runnable() {
 			public void run() {
 				try {
 					initialize();
 					frame.setVisible(true);
-					serverEventListener = new WindowServerEventListener("WindowServerEventListener");
-					serverEventListener.start();
-					card.checkCardReader();
-					card.checkSmartcard();
-					card.connectCard();
-					String[] parsedData = card.readOnCard().split(";");
-					if (parsedData.length >= 2) {
-						userName = parsedData[0];
-						userLastName = parsedData[1];
-
-						/***
-						 * Send userName and userLastName to server
-						 */
-						serverConnection.setMessage("HEL1" + ";" + userName + ";" + userLastName);
-
-					}					
+					
+					loginServerEventListener = new ServerEventListener("WindowServerEventListener", serverConnection, getSelf());
+					loginServerEventListener.start();
+					loginSmartcardReaderListener = new SmartcardReaderListener("SmartcardReaderListener", card, getSelf());
+					loginSmartcardReaderListener.start();
 				} catch (Exception e) {
 					e.printStackTrace();
 				}
@@ -62,63 +58,18 @@ public class WindowLogin {
 		});
 	}
 
-	class WindowServerEventListener extends Thread { 
-
-		public WindowServerEventListener (String s) {
-				super(s);
-				this.setDaemon(true);
-			}
-			
-		public void run() { 
-			String flag = "";
-			String data = "";
-			String[] parsedData;
-			try {
-				while(true) {
-					Thread.sleep(250);
-					if (	serverConnection != null && 
-							!serverConnection.getLastResponse().isEmpty()
-						) {
-						parsedData = serverConnection.getLastResponse().split(";");
-						flag = parsedData[0];
-						data = parsedData[1];
-						/***
-						* HELLO : get SALT 2
-						* LOG1 : Auth result
-						*/
-						switch(flag) {
-							case "HEL1":
-								salt2 = data;
-								serverConnection.setSessionToken(data);
-								
-								// Cleanup
-								serverConnection.setLastResponse("");
-								break;
-
-							case "LOG1":
-								if (data.equals("OK")) {
-									classLogger("Access granted");
-								} else if (data.equals("KO")) {
-									classLogger("Access denied");
-								}
-								
-								// Cleanup
-								serverConnection.setLastResponse("");
-								
-							default:
-								//
-						}
-					}
-				}
-			} catch (Exception e) {
-				e.printStackTrace();
-			}
-		} 
+	// GETTERS & SETTERS
+    public WindowLogin getSelf() {
+    	return this;
+    }
+    
+    // VISIBILITY
+	public void setFrameVisible(boolean visible) {
+		if (visible != frame.isVisible())
+			frame.setVisible(visible);
 	}
-
-	/**
-	 * Initialize the contents of the frame.
-	 */
+	
+	// INIT. FRAME
 	private void initialize() {
 		frame = new JFrame();
 		frame.setBounds(100, 100, 450, 300);
@@ -156,12 +107,13 @@ public class WindowLogin {
 				String 	userLogin = textFieldLogin.getText(),
 						userPassword = passwordField.getText();
 				
-				/*** TODO
-				 * PBDKF2
-				 */
-				String rch = String.valueOf((userLogin + userPassword).hashCode());
+				String rch = userLogin + userPassword;
+				// SHA-256 signature
+				rch = AuthClientUtils.sha256Signature(rch);
+				
+				// DERIAVATION (PBDKF2)
 				for (int i = 0; i < 1000; i++) {
-					rch = String.valueOf((rch + serverConnection.getSessionToken()).hashCode());
+					rch = AuthClientUtils.sha256Signature(rch + serverConnection.getSessionToken());
 				}
 				
 				serverConnection.setMessage("LOG1;" + rch);
