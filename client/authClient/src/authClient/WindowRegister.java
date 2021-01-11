@@ -29,7 +29,7 @@ public class WindowRegister {
 	private JLabel lblName;
 	private JLabel lblLogin;
 	private JLabel lblPassword;
-
+	
 	private AuthClient serverConnection;
 	private ServerEventListener serverEventListener;
 	

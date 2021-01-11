@@ -62,7 +62,6 @@ public class WindowLogin {
 		});
 	}
 
-
 	class WindowServerEventListener extends Thread { 
 
 		public WindowServerEventListener (String s) {
