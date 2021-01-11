@@ -1,9 +1,12 @@
 package authClient;
 
 
+import java.io.BufferedReader;
 import java.io.IOException;
+import java.io.InputStreamReader;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
+import java.io.PrintWriter;
 import java.net.InetAddress;
 import java.net.Socket;
 import java.net.UnknownHostException;
@@ -16,62 +19,56 @@ import java.util.Random;
  */
 public class AuthClient extends Thread {
 	
+	/***
+	 * Server infos.
+	 */
+	private Socket clientSocket;
+	private String serverAddr;
+	private int serverPort;
+	
+	/***
+	 * Client/server communication canals
+	 */
+	BufferedReader inputStream;
+	PrintWriter outputStream;
+
 	private String message;
 	private String response;
 	private String lastResponse;
 
-	public AuthClient (String s) {
+	/***
+	 * Session data
+	 */
+	private String sessionToken;
+	
+	public void setSessionToken(String token) {
+		sessionToken = token;
+	}
+	
+	public String getSessionToken() {
+		return sessionToken;
+	}
+	
+	/***
+	 * Constructor
+	 */
+	public AuthClient (String s, String argServerAddr, int argServerPort) {
 		super(s);
 		this.setDaemon(true);
 		message = "";
 		response = "";
 		lastResponse = "";
-	}
-			
-	public void run() { 
-		try {
-	        //get the localhost IP address, if server is running on some other IP, you need to use that
-	        InetAddress host = InetAddress.getLocalHost();
-	        Socket socket = null;
-	        ObjectOutputStream oos = null;
-	        ObjectInputStream ois = null;
-	        
-            while (true) {
-            	Thread.sleep(100);
-            	if (!message.isEmpty()) {
-                    //establish socket connection to server
-                    socket = new Socket(host.getHostName(), 9876);
-                	
-                    //write to socket using ObjectOutputStream
-                    oos = new ObjectOutputStream(socket.getOutputStream());
-                    oos.writeObject(message);
-                    
-                    //read the server response message
-                    ois = new ObjectInputStream(socket.getInputStream());
-                    response = (String) ois.readObject();
 
-                    // Cleanup
-                    ois.close();
-                    oos.close();
-                    Thread.sleep(100);
-                    message = "";
-            	}
-            	
-            	if (!response.isEmpty()) {
-            		classLogger("Response received from server : " + response);
-            		Thread.sleep(100);
-            		lastResponse = response;
-            		response = "";
-            	}
-            }
-	        
-		} catch (Exception e) {
-			//
+		try {
+			clientSocket = new Socket(argServerAddr, argServerPort);
+			if (clientSocket != null)
+				classLogger("Connection opened at server : " + argServerAddr + ":" + argServerPort);
+			
+			inputStream = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
+			outputStream = new PrintWriter(clientSocket.getOutputStream(), true);
+		} catch (IOException e) {
+			e.printStackTrace();
 		}
-	}
-	
-	public void classLogger(String msg) {
-		System.out.println("[AuthClient]: " + msg);
 	}
 
 	public void setMessage(String msg) {
@@ -82,4 +79,41 @@ public class AuthClient extends Thread {
 		return lastResponse;
 	}
 	
+	public void setLastResponse(String msg) {
+		lastResponse = msg;
+	}
+
+	public void run() { 
+		try {    
+            while (true) {
+            	Thread.sleep(250);
+            	if (!message.isEmpty()) {
+            		classLogger("Send message to client : " + message);
+					// Write message when available
+					outputStream.println(message);
+                    
+					// Read response
+					try {
+						response = inputStream.readLine();
+					} catch (IOException e) {
+						e.printStackTrace();
+					}
+
+                    message = "";
+            	}
+            	
+            	if (!response.isEmpty()) {
+            		classLogger("Response received from server : " + response);
+            		lastResponse = response;
+            		response = "";
+            	}
+            }
+		} catch (Exception e) {
+			//
+		}
+	}
+	
+	public void classLogger(String msg) {
+		System.out.println("[AuthClient]: " + msg);
+	}
 }

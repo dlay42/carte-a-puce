@@ -86,7 +86,7 @@ public class WindowRegister {
 	 */
 	public WindowRegister(Smartcard readCard) {
 		card = readCard;
-		serverConnection = new AuthClient("RegisterAuthClient");
+		serverConnection = new AuthClient("RegisterAuthClient", "127.0.0.1", 9876);
 		EventQueue.invokeLater(new Runnable() {
 			public void run() {
 				try {
@@ -188,7 +188,6 @@ public class WindowRegister {
 							 * Envoi du SALT1 = H(login+passwd)
 							 */
 							String salt1 = userLogin + userPassword;
-							classLogger("Send '" + "REG1;" + toWriteOnCard + ';' + salt1.hashCode() + "' to server");
 							serverConnection.setMessage("REG1;" + toWriteOnCard + ';' + salt1.hashCode());
 						}
 					

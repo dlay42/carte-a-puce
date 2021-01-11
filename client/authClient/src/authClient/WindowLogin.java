@@ -19,25 +19,102 @@ public class WindowLogin {
 	private JTextField textFieldLogin;
 	private JPasswordField passwordField;
 
-	private AuthClient serverConnection;
+	private String userName;
+	private String userLastName;
 	
+	private String salt2;
+
+	private AuthClient serverConnection;
+	private WindowServerEventListener serverEventListener;
+
 	/**
 	 * Create the application.
 	 */
 	public WindowLogin(Smartcard readCard) {
 		card = readCard;
-		serverConnection = new AuthClient("LoginAuthClient");
+		serverConnection = new AuthClient("LoginAuthClient", "127.0.0.1", 9876);
 		serverConnection.start();
 		EventQueue.invokeLater(new Runnable() {
 			public void run() {
 				try {
 					initialize();
 					frame.setVisible(true);
+					serverEventListener = new WindowServerEventListener("WindowServerEventListener");
+					serverEventListener.start();
+					card.checkCardReader();
+					card.checkSmartcard();
+					card.connectCard();
+					String[] parsedData = card.readOnCard().split(";");
+					if (parsedData.length >= 2) {
+						userName = parsedData[0];
+						userLastName = parsedData[1];
+
+						/***
+						 * Send userName and userLastName to server
+						 */
+						serverConnection.setMessage("HEL1" + ";" + userName + ";" + userLastName);
+
+					}					
 				} catch (Exception e) {
 					e.printStackTrace();
 				}
 			}
 		});
+	}
+
+
+	class WindowServerEventListener extends Thread { 
+
+		public WindowServerEventListener (String s) {
+				super(s);
+				this.setDaemon(true);
+			}
+			
+		public void run() { 
+			String flag = "";
+			String data = "";
+			String[] parsedData;
+			try {
+				while(true) {
+					Thread.sleep(250);
+					if (	serverConnection != null && 
+							!serverConnection.getLastResponse().isEmpty()
+						) {
+						parsedData = serverConnection.getLastResponse().split(";");
+						flag = parsedData[0];
+						data = parsedData[1];
+						/***
+						* HELLO : get SALT 2
+						* LOG1 : Auth result
+						*/
+						switch(flag) {
+							case "HEL1":
+								salt2 = data;
+								serverConnection.setSessionToken(data);
+								
+								// Cleanup
+								serverConnection.setLastResponse("");
+								break;
+
+							case "LOG1":
+								if (data.equals("OK")) {
+									classLogger("Access granted");
+								} else if (data.equals("KO")) {
+									classLogger("Access denied");
+								}
+								
+								// Cleanup
+								serverConnection.setLastResponse("");
+								
+							default:
+								//
+						}
+					}
+				}
+			} catch (Exception e) {
+				e.printStackTrace();
+			}
+		} 
 	}
 
 	/**
@@ -81,11 +158,14 @@ public class WindowLogin {
 						userPassword = passwordField.getText();
 				
 				/*** TODO
-				 * Inscription à la base de données
-				 * Envoi du SALT1 = H(login+passwd)
+				 * PBDKF2
 				 */
-				String salt1 = userLogin + userPassword;
-				System.out.println(salt1.hashCode());
+				String rch = String.valueOf((userLogin + userPassword).hashCode());
+				for (int i = 0; i < 1000; i++) {
+					rch = String.valueOf((rch + serverConnection.getSessionToken()).hashCode());
+				}
+				
+				serverConnection.setMessage("LOG1;" + rch);
 			}
 		});
 		btnLogin.setBounds(154, 209, 127, 25);

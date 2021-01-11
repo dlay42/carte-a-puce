@@ -10,14 +10,28 @@ import java.sql.Statement;
 
 public class AuthDatabase {
 	
-	private String url = "jdbc:mysql://localhost:3306/authdb";
-	private String dbUser = "authsrv";
-	private String dbPassword = "azerty";
-	Connection dbConnection;
+	private String 	url,
+					dbType,
+					dbAddr,
+					database,
+					dbUser,
+					dbPassword;
+	private int dbPort;
+	private Connection dbConnection;
 	
-	public AuthDatabase() {
+	public AuthDatabase(String type, String addr, int port, String db, String user, String password) {
 		dbConnection = null;
+		url = "";
+		
+		dbType = type;
+		dbAddr = addr;
+		dbPort = port;
+		database = db;
+		dbUser = user;
+		dbPassword = password;
+		
 		try {
+			url = "jdbc:"+dbType+"://"+dbAddr+":"+String.valueOf(dbPort)+"/"+database;
 			dbConnection = DriverManager.getConnection(url, dbUser, dbPassword);
 		} catch (SQLException e) {
 			e.printStackTrace();
@@ -25,6 +39,9 @@ public class AuthDatabase {
 	}
 	
 
+	/***
+	 * Insert into User table
+	 */
 	public int insertUserRow(String name, String lastName, String salt1) {
 		final String SQL_INSERT = "INSERT INTO auth_user VALUES (?,?,?,?,?,?,?)";
 	
@@ -53,38 +70,97 @@ public class AuthDatabase {
 	        }
 		} catch (SQLException e) {
             System.err.format("SQL State: %s\n%s", e.getSQLState(), e.getMessage());
+        	classLogger("User registration on DB failed");
+        	return -1;
+        } catch (Exception e) {
+            e.printStackTrace();
+        	classLogger("User registration on DB failed");
+        	return -1;
+        }
+	}
+	
+	/***
+	 * Find out if user exists using his name and last name
+	 * TODO: add biometric informations to get unique result
+	 */
+	public String userExistsNameLastName(String userName, String userLastName) {
+		final String SQL_SELECT = "SELECT * FROM auth_user WHERE name=? AND last_name=?";
+		String userId = "";
+
+		try  {
+			dbConnection = DriverManager.getConnection(url, dbUser, dbPassword);
+			
+			classLogger("Looking for user in DB with name=" + userName + "; lastName=" + userLastName );
+			
+			PreparedStatement preparedStatement = dbConnection.prepareStatement(SQL_SELECT);
+	        preparedStatement.setString(1, userName);
+	        preparedStatement.setString(2, userLastName);
+	        
+	        ResultSet resultSet = preparedStatement.executeQuery();
+
+
+	        if (resultSet.next() != false) {
+    			classLogger("User exists in DB");
+				do {
+					userId = resultSet.getString("user_id");
+				} while (resultSet.next());
+				return userId;
+	        } else {
+	        	classLogger("User does not exist in DB");
+	        	return "";
+	        }
+		} catch (SQLException e) {
+            System.err.format("SQL State: %s\n%s", e.getSQLState(), e.getMessage());
         } catch (Exception e) {
             e.printStackTrace();
         }
 
-		return 0;
+		return "";
+	}
+
+
+	/***
+	 * Select User using :
+	 *  - name
+	 *  - last name
+	 * TODO: add biometric infos. for accurate identification
+	 */
+	public String getHashPasswordNameLastName(String userName, String userLastName) {
+		final String SQL_SELECT = "SELECT * FROM auth_user WHERE name=? AND last_name=?";
+		String hashPassword = "";
+
+		try  {
+			dbConnection = DriverManager.getConnection(url, dbUser, dbPassword);
+			
+			classLogger("Looking for H(SALT1 + password) for " + userName + ";" + userLastName);
+			
+			PreparedStatement preparedStatement = dbConnection.prepareStatement(SQL_SELECT);
+	        preparedStatement.setString(1, userName);
+			preparedStatement.setString(2, userLastName);
+	        
+	        ResultSet resultSet = preparedStatement.executeQuery();
+
+	        if (resultSet.next() != false) {
+    			classLogger("H(SALT1 + password) found in DB");
+				do {
+					hashPassword = resultSet.getString("password");
+				} while (resultSet.next());
+				return hashPassword;
+	        } else {
+	        	classLogger("H(SALT1 + password) not found in DB");
+	        	return "";
+	        }
+		} catch (SQLException e) {
+            System.err.format("SQL State: %s\n%s", e.getSQLState(), e.getMessage());
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
+		return "";
 	}
 	
+
     private void classLogger(String msg) {
     	System.out.println("[AuthDatabase]: " + msg);
     }
-	
-	/*
-	public static void main(String[] args) {
-		
-		String url = "jdbc:mysql://localhost:3306/authdb";
-		String db_user = "authsrv";
-		String db_passwd = "azerty";
-		
-		
-
-		
-		try {
-			Statement stmt = db_connection.createStatement();
-			ResultSet rs = stmt.executeQuery("SELECT * FROM auth_user;");
-			while (rs.next()) {
-				  String lastName = rs.getString("name");
-				  System.out.println(lastName + "\n");
-			}
-		} catch (SQLException e) {
-			// TODO Auto-generated catch block
-			//e.printStackTrace();
-		}
-	}
-	*/
 }

@@ -2,3 +2,6 @@
 biometric/bin
 biometric/build
 biometric/bin/lib
+
+# VSCode
+.vscode
